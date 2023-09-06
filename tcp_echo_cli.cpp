@@ -1,4 +1,4 @@
-#include <sys/socket/h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <stdio.h>
@@ -8,6 +8,7 @@
 #include <errno.h>
 #define MAXLINE 1024
 #define SERV_PORT 10020
+typedef struct sockaddr SA;
 
 void err_quit(const char *msg) {
     printf("%s\n", msg);
@@ -60,7 +61,7 @@ ssize_t readline(int sockfd, void *buff, size_t maxlen) {
     size_t n, rc;
     char c, *p;
 
-    p = buff;
+    p = (char *)buff;
     for(n = 1; n < maxlen; n++) {
         if((rc = my_read(sockfd, &c)) == 1) {
             *p++ = c;
@@ -80,11 +81,11 @@ ssize_t readline(int sockfd, void *buff, size_t maxlen) {
 void str_cli(FILE *fdp, int sockfd) {
     char sendline[MAXLINE], recvline[MAXLINE];
 
-    while(fget(sockfd, sendline, MAXLINE) != NULL) {
+    while(fgets(sendline, MAXLINE, fdp) != NULL) {
         writen(sockfd, sendline, strlen(sendline));
         if(readline(sockfd, recvline, MAXLINE) == 0)
             err_quit("str_cli: server terminated permaturely");
-        fput(recvline, stdout);
+        fputs(recvline, stdout);
     }
 }
 
@@ -102,7 +103,7 @@ int main(int argc, char *argv[]) {
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(SERV_PORT);
-    inte_ptons(AF_INET, argv[1], &servaddr.sin_addr);
+    inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
 
     if((n = connect(sockfd, (SA *)&servaddr, sizeof(servaddr))) == -1) {
         sprintf(msg, "connect %s:%d error", argv[1], SERV_PORT);
