@@ -39,6 +39,7 @@ void datagram_cli(FILE *fp, int sockfd, const struct sockaddr *pservaddr, sockle
     /*若当前udp服务器未开启，则会阻塞待fgets上，sendto，recvfrom返回错误*/
     while(fgets(sendline, MAXLINE, fp) != NULL) { /*从标准输入中读取数据*/
         sendto(sockfd, sendline, strlen(sendline), 0, pservaddr, servlen); /*发送数据*/
+        /*todo 我们并不知道recvfrom接收的数据是否来自我们发送的服务器，我们需要接收对端的地址数据并进行比较*/
         recvfrom(sockfd, recvline, MAXLINE, 0, NULL, NULL); /*接收服务器的应答，这里服务器地址和长度设置NULL，表示不关心其地址*/
         fputs(recvline, stdout); /*将服务器应答送往标准输出*/
     }
