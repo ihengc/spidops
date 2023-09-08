@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     char buf[MAXLINE];
     ssize_t nread;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
