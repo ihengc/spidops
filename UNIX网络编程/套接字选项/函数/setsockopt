@@ -1,0 +1,3 @@
+#include <sys/socket.h>
+int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+// 返回：若成功则为0，若出错则为-1

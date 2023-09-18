@@ -1,0 +1,4 @@
+#include <sys/socket.h>
+int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
+
+// 返回：若成功则围殴0，若出错则为-1
