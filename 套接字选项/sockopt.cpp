@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <stdio.h>
+#include <unistd.h>
 
 /* 套接字选择值 */
 union optval {
@@ -10,7 +11,7 @@ union optval {
     struct linger linger_val;
     struct timeval timeval_val;
 } val;
-
+static char strres[128];
 static char *sock_str_flag(union val *, int); /* *optval是整数 */
 static char *sock_str_int(union val *, int);
 static char *sock_str_linger(union val *, int);
@@ -101,4 +102,12 @@ int main(int argc, char **argv) {
         }
     }
     return 0;
+}
+
+static char *sock_str_flag(union val *ptr, int len) {
+    if(len != sizeof(int))
+        snprintf(strres, sizeof(strres), "size (%d) not sizeof(int)", len);
+    else
+        snprintf(strres, sizeof(strres), "%s", (ptr->i_val == 0) ? "off" : "on");
+    return strres;
 }
