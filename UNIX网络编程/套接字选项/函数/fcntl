@@ -1,7 +1,0 @@
-fcntl函数
-
-"file control"（文件控制）。fcntl可执行各种描述符控制操作。
-
-#include <fcntl.h>
-int fcntl(int fd, int cmd, ... /* int arg */);
-// 返回：若成功则取决于cmd，若出错则为-1
