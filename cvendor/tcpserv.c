@@ -23,7 +23,7 @@ typedef struct {
     pthread_mutex_t lock;
     pthread_cond_t notify;
     pthread_t *threads;
-    task_t *task;
+    task_t *tasks;
     int thread_count;
     int task_count;
     int head;
@@ -31,6 +31,29 @@ typedef struct {
     int is_shutdown;
     int started_num;
 } threadpool_t;
+
+void *thread_func(void *arg) {
+    threadpool_t *pool = (threadpool_t *)arg;
+    for( ; ; ) {
+        pthread_mutex_lock(&(pool->lock));
+        while(pool->task_count == 0 && !pool->is_shutdown) {
+            pthread_cond_wait(&(pool->notify), &(pool->lock));
+        }
+
+        if(pool->is_shutdown) {
+            pthread_mutex_unlock(&(pool->lock));
+            pthread_exit(NULL);
+        }
+
+        task_t task = pool->tasks[pool->head];
+        pool->head = (pool->head + 1) % MAX_THREADS;
+        pool->task_count--;
+
+        pthread_mutex_unlock(&(pool->lock));
+
+        (*(task.function))(task.arg);
+    }
+}
 
 void threadpool_init(threadpool_t *pool, int thread_num) {
     int i;
@@ -42,7 +65,7 @@ void threadpool_init(threadpool_t *pool, int thread_num) {
             thread_num = MAX_THREADS;
 
     pool->threads = (pthread_t *)malloc(sizeof(pthread_t) * thread_num);
-    pool->tasks = (task_t)malloc(sizeof(task_t) * MAX_TASKS);
+    pool->tasks = (task_t *)malloc(sizeof(task_t) * MAX_TASKS);
     pool->thread_count = 0;
     pool->task_count = 0;
     pool->head = 0;
@@ -94,40 +117,38 @@ int threadpool_add_task(threadpool_t *pool, void(*function)(void *), void *arg) 
     return 0;
 }
 
-void *thread_func(void *arg) {
-    threadpool_t *pool = (threadpool_t *)arg;
-    for( ; ; ) {
-        pthread_mutex_lock(&(pool->lock));
-        while(pool->task_count == 0 && !pool->is_shutdown) {
-            pthread_cond_wait(&(pool->notify), &(pool->lock));
-        }
-
-        if(pool->is_shutdown) {
-            pthread_mutex_unlock(&(pool->lock));
-            pthread_exit(NULL);
-        }
-
-        task_t task = pool->tasks[pool->head];
-        pool->head = (pool->head + 1) % MAX_THREADS;
-        pool->task_count--;
-
-        pthread_mutex_unlock(&(pool->lock));
-
-        (*(task.function))(task.arg);
-    }
-}
-
 typedef struct {
     int fd;
     char *rdbuf;
     int rdbuf_size;
 } tcpconn_t;
 
-ssize_t readn(int sockfd, void *vptr, size_t len) {
 
+ssize_t readn(int sockfd, void *vptr, size_t len) {
+    size_t nleft;
+    ssize_t nread;
+    char *p;
+
+    p = (char *)vptr;
+    nleft = len;
+    while(nleft > 0) {
+        if((nread = read(sockfd, p, nleft)) < 0) {
+            if(errno = EINTR)
+                nread = 0;
+            else
+                break;
+        } else if(nread = 0) {
+            break;
+        } else {
+            nleft -= nread;
+            p += nread;
+        }
+    }
+    return (len - nleft);
 }
 
-void handle_conn(const tcpconn_t *tcpconn) {
+void handle_conn(void *arg) {
+    tcpconn_t *tcpconn = (tcpconn_t *)arg;
 
 }
 
@@ -138,14 +159,20 @@ int main(int argc, char **argv) {
     socklen_t addrlen;
     fd_set readset;
     threadpool_t threadpool;
+    char addrbuf[INET_ADDRSTRLEN];
 
     if(argc != 2) {
         printf("usage tcpserv <port>\n");
         exit(-1);
     }
-    port = atoi(argv[2]);
+    port = atoi(argv[1]);
     if(port < 0 || port > (1<<16)-1) {
         printf("port %d must be in [0, 65535]\n", port);
+        exit(-1);
+    }
+
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("socket error:%s\n", strerror(errno));
         exit(-1);
     }
 
@@ -195,8 +222,12 @@ int main(int argc, char **argv) {
                 addrlen = sizeof(cliaddr);
                 if((connfd = accept(sockfd, (struct sockaddr*)&cliaddr, &addrlen)) < 0) {
                     printf("accept error:%s\n", strerror(errno));
-                    continue;
                 } else {
+                    if(inet_ntop(AF_INET, &cliaddr.sin_addr, addrbuf, INET_ADDRSTRLEN) == NULL) {
+                        printf("inet_ntop error:%s\n", strerror(errno));
+                    } else {
+                        printf("connect by %s:%d\n", addrbuf, port);
+                    }
                     for(i = 1; i < FD_SETSIZE; i++) {
                         if(connfds[i] == -1) {
                             connfds[i] = connfd;
@@ -207,7 +238,7 @@ int main(int argc, char **argv) {
             }
             for(i = 0; i < FD_SETSIZE; i++) {
                 if(FD_ISSET(connfds[i], &readset)) {
-                    threadpool_add_task(*threadpool, )
+                    threadpool_add_task(&threadpool, handle_conn, NULL);
                 }
             }
         }
